@@ -6,8 +6,9 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ChannelType
-} = require('discord.js');
+  ChannelType,
+  ActivityType
+} = require("discord.js");
 
 const client = new Client({
   intents: [
@@ -25,51 +26,51 @@ const PREFIX = ".";
 const eco = new Map();
 const ticketCategoryName = "TICKETS";
 
-// ===== READY =====
-client.once("clientReady", (client) => {
+// ===== READY EVENT (FIXED) =====
+client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
-});
+
   client.user.setPresence({
-    activities: [{ name: "Advanced System 🚀" }],
+    activities: [{ name: "Advanced System 🚀", type: ActivityType.Playing }],
     status: "dnd"
   });
 });
 
-// ================= ECONOMY FUNCTIONS =================
+// ================= ECONOMY =================
 function getBal(id) {
   return eco.get(id) || { cash: 0, bank: 0 };
 }
+
 function setBal(id, data) {
   eco.set(id, data);
 }
 
 // ================= MESSAGE COMMANDS =================
-client.on('messageCreate', async (msg) => {
+client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
   const args = msg.content.split(" ");
-  const cmd = args[0].toLowerCase();
+  const rawCmd = args[0].toLowerCase();
 
-  // ===== OWNER NO PREFIX =====
+  // OWNER NO PREFIX COMMANDS
   if (msg.author.id === OWNER_ID) {
-
-    if (cmd === "bal") {
+    if (rawCmd === "bal") {
       const bal = getBal(msg.author.id);
       return msg.reply(`💰 Cash: ${bal.cash} | Bank: ${bal.bank}`);
     }
 
-    if (cmd === "daily") {
+    if (rawCmd === "daily") {
       let bal = getBal(msg.author.id);
       bal.cash += 500;
       setBal(msg.author.id, bal);
-      return msg.reply("💸 Daily claimed (Owner)");
+      return msg.reply("💸 Daily claimed (Owner Bonus)");
     }
   }
 
-  // ===== PREFIX COMMANDS =====
+  // PREFIX CHECK
   if (!msg.content.startsWith(PREFIX)) return;
 
-  const command = cmd.slice(PREFIX.length);
+  const command = rawCmd.slice(PREFIX.length);
 
   // ===== ECONOMY =====
   if (command === "bal") {
@@ -86,29 +87,33 @@ client.on('messageCreate', async (msg) => {
 
   if (command === "work") {
     let bal = getBal(msg.author.id);
-    const earn = Math.floor(Math.random() * 300);
+    const earn = Math.floor(Math.random() * 300) + 1;
     bal.cash += earn;
     setBal(msg.author.id, bal);
-    return msg.reply(`💼 You earned ${earn}`);
+    return msg.reply(`💼 You earned ${earn} coins`);
   }
 
   // ===== MODERATION =====
   if (command === "kick") {
     if (!msg.member.permissions.has(PermissionsBitField.Flags.KickMembers))
-      return msg.reply("No permission");
+      return msg.reply("❌ No permission");
 
-    const user = msg.mentions.users.first();
-    await msg.guild.members.kick(user.id);
-    msg.reply(`👢 Kicked ${user.tag}`);
+    const user = msg.mentions.members.first();
+    if (!user) return msg.reply("❌ Mention a user");
+
+    await user.kick();
+    msg.reply(`👢 Kicked ${user.user.tag}`);
   }
 
   if (command === "ban") {
     if (!msg.member.permissions.has(PermissionsBitField.Flags.BanMembers))
-      return msg.reply("No permission");
+      return msg.reply("❌ No permission");
 
-    const user = msg.mentions.users.first();
-    await msg.guild.members.ban(user.id);
-    msg.reply(`🚫 Banned ${user.tag}`);
+    const user = msg.mentions.members.first();
+    if (!user) return msg.reply("❌ Mention a user");
+
+    await user.ban();
+    msg.reply(`🚫 Banned ${user.user.tag}`);
   }
 
   // ===== TICKET PANEL =====
@@ -129,68 +134,58 @@ client.on('messageCreate', async (msg) => {
   }
 });
 
-// ================= BUTTONS =================
-client.on('interactionCreate', async (interaction) => {
+// ================= INTERACTIONS =================
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isButton()) return;
 
-  if (interaction.isButton()) {
+  // ===== CREATE TICKET =====
+  if (interaction.customId === "ticket_create") {
+    let category = interaction.guild.channels.cache.find(
+      (c) => c.name === ticketCategoryName && c.type === ChannelType.GuildCategory
+    );
 
-    // CREATE TICKET
-    if (interaction.customId === "ticket_create") {
-
-      let category = interaction.guild.channels.cache.find(
-        c => c.name === ticketCategoryName && c.type === ChannelType.GuildCategory
-      );
-
-      if (!category) {
-        category = await interaction.guild.channels.create({
-          name: ticketCategoryName,
-          type: ChannelType.GuildCategory
-        });
-      }
-
-      const channel = await interaction.guild.channels.create({
-        name: `ticket-${interaction.user.username}`,
-        type: ChannelType.GuildText,
-        parent: category.id,
-        permissionOverwrites: [
-          {
-            id: interaction.guild.id,
-            deny: [PermissionsBitField.Flags.ViewChannel]
-          },
-          {
-            id: interaction.user.id,
-            allow: [PermissionsBitField.Flags.ViewChannel]
-          }
-        ]
+    if (!category) {
+      category = await interaction.guild.channels.create({
+        name: ticketCategoryName,
+        type: ChannelType.GuildCategory
       });
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("ticket_close")
-          .setLabel("Close Ticket")
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await channel.send({
-        content: `🎫 ${interaction.user} welcome! Staff will assist you.`,
-        components: [row]
-      });
-
-      return interaction.reply({ content: `Created: ${channel}`, ephemeral: true });
     }
 
-    // CLOSE TICKET
-    if (interaction.customId === "ticket_close") {
-      await interaction.reply("Closing...");
-      setTimeout(() => interaction.channel.delete(), 2000);
-    }
+    const channel = await interaction.guild.channels.create({
+      name: `ticket-${interaction.user.username}`,
+      type: ChannelType.GuildText,
+      parent: category.id,
+      permissionOverwrites: [
+        {
+          id: interaction.guild.id,
+          deny: [PermissionsBitField.Flags.ViewChannel]
+        },
+        {
+          id: interaction.user.id,
+          allow: [PermissionsBitField.Flags.ViewChannel]
+        }
+      ]
+    });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("ticket_close")
+        .setLabel("Close Ticket")
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await channel.send({
+      content: `🎫 ${interaction.user} welcome! Staff will assist you.`,
+      components: [row]
+    });
+
+    return interaction.reply({ content: `Ticket created: ${channel}`, ephemeral: true });
   }
 
-  // ===== SLASH COMMAND EXAMPLE =====
-  if (interaction.isChatInputCommand()) {
-    if (interaction.commandName === "ping") {
-      return interaction.reply(`🏓 ${client.ws.ping}ms`);
-    }
+  // ===== CLOSE TICKET =====
+  if (interaction.customId === "ticket_close") {
+    await interaction.reply("🔒 Closing ticket...");
+    setTimeout(() => interaction.channel.delete(), 2000);
   }
 });
 
