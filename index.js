@@ -26,8 +26,9 @@ const eco = new Map();
 const ticketCategoryName = "TICKETS";
 
 // ===== READY =====
-client.once('ready', () => {
+client.once("clientReady", (client) => {
   console.log(`Logged in as ${client.user.tag}`);
+});
   client.user.setPresence({
     activities: [{ name: "Advanced System 🚀" }],
     status: "dnd"
