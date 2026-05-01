@@ -5,7 +5,7 @@ module.exports = {
   description: "30+ moderation commands system",
 
   run: async (client, msg, args) => {
-    if (!msg.content.startsWith(".")) return;
+    if (!msg.content.startsWith("+")) return;
 
     const cmd = msg.content.split(" ")[0].slice(1).toLowerCase();
     const member = msg.mentions.members.first();
