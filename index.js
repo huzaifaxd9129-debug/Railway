@@ -21,17 +21,18 @@ const client = new Client({
 
 const OWNER_ID = "1363540480662704248";
 const PREFIX = ".";
+const WELCOME_CHANNEL_ID = "123456789012345678";
 
 // ===== DATABASE =====
 const eco = new Map();
 const ticketCategoryName = "TICKETS";
 
-// ===== READY EVENT (FIXED) =====
+// ===== READY =====
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 
   client.user.setPresence({
-    activities: [{ name: "Advanced System 🚀", type: ActivityType.Playing }],
+    activities: [{ name: "👑 Made By Huztro", type: ActivityType.Playing }],
     status: "dnd"
   });
 });
@@ -45,6 +46,26 @@ function setBal(id, data) {
   eco.set(id, data);
 }
 
+// ================= WELCOME SYSTEM =================
+client.on("guildMemberAdd", async (member) => {
+  const channel = member.guild.systemChannel || member.guild.channels.cache.find(c => c.type === ChannelType.GuildText);
+
+  if (!channel) return;
+
+  const embed = new EmbedBuilder()
+    .setTitle("👋 Welcome to the Server!")
+    .setDescription(`Hey ${member}, welcome to **${member.guild.name}** 🚀`)
+    .setColor("Green")
+    .addFields(
+      { name: "👥 Member Count", value: `${member.guild.memberCount}`, inline: true },
+      { name: "📌 Enjoy your stay!", value: "Read rules & have fun 😄", inline: true }
+    )
+    .setThumbnail(member.user.displayAvatarURL())
+    .setFooter({ text: "Welcome System Active" });
+
+  channel.send({ embeds: [embed] });
+});
+
 // ================= MESSAGE COMMANDS =================
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
@@ -52,7 +73,7 @@ client.on("messageCreate", async (msg) => {
   const args = msg.content.split(" ");
   const rawCmd = args[0].toLowerCase();
 
-  // OWNER NO PREFIX COMMANDS
+  // ===== OWNER NO PREFIX =====
   if (msg.author.id === OWNER_ID) {
     if (rawCmd === "bal") {
       const bal = getBal(msg.author.id);
@@ -67,10 +88,43 @@ client.on("messageCreate", async (msg) => {
     }
   }
 
-  // PREFIX CHECK
+  // ===== PREFIX CHECK =====
   if (!msg.content.startsWith(PREFIX)) return;
 
   const command = rawCmd.slice(PREFIX.length);
+
+  // ================= HELP COMMAND =================
+  if (command === "help") {
+    const embed = new EmbedBuilder()
+      .setTitle("🤖 Bot Help Menu")
+      .setColor("Blue")
+      .setDescription("All available commands")
+      .addFields(
+        {
+          name: "💰 Economy",
+          value: ".bal\n.daily\n.work",
+          inline: true
+        },
+        {
+          name: "🛡 Moderation",
+          value: ".kick @user\n.ban @user",
+          inline: true
+        },
+        {
+          name: "🎫 Tickets",
+          value: ".panel",
+          inline: true
+        },
+        {
+          name: "👑 Owner",
+          value: "bal\ndaily (no prefix)",
+          inline: false
+        }
+      )
+      .setFooter({ text: "Prefix: ." });
+
+    return msg.reply({ embeds: [embed] });
+  }
 
   // ===== ECONOMY =====
   if (command === "bal") {
