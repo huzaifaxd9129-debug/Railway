@@ -289,6 +289,21 @@ client.on("messageCreate", async (msg) => {
     return msg.reply("🏆 Leaderboard\n" + text);
   }
 
+  if (cmd === "addmoney") {
+  if (!msg.member.permissions.has(PermissionsBitField.Flags.Administrator))
+    return msg.reply("❌ Admin only command");
+
+  const user = msg.mentions.users.first();
+  const amount = parseInt(args[1]);
+
+  if (!user || !amount) return msg.reply("Usage: +addmoney @user 1000");
+
+  const u = getUser(user.id);
+  u.wallet += amount;
+
+  saveEco();
+  return msg.reply(`➕ Added $${amount} to ${user.username}`);
+}
   // ================= 40+ MOD SYSTEM =================
   if (cmd === "mod") {
   const mcmd = args.shift()?.toLowerCase();
