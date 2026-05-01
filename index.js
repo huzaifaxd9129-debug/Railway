@@ -11,8 +11,6 @@ const {
   Collection
 } = require("discord.js");
 
-const fs = require("fs");
-
 const client = new Client({
   intents: Object.values(GatewayIntentBits)
 });
@@ -65,17 +63,6 @@ client.on("messageCreate", async (msg) => {
   const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
   const cmd = args.shift().toLowerCase();
   const member = msg.mentions.members.first();
-
-  // ================= LOADED FILE COMMANDS =================
-  const command = client.commands.get(cmd);
-  if (command) {
-    try {
-      return command.execute(client, msg, args, member, PermissionsBitField);
-    } catch (err) {
-      console.error(err);
-      return msg.reply("❌ Error running command");
-    }
-  }
 
   // ================= PING =================
   if (cmd === "ping") {
