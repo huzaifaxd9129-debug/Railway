@@ -19,13 +19,15 @@ const client = new Client({
   ]
 });
 
+// ===== CONFIG =====
 const OWNER_ID = "1363540480662704248";
 const PREFIX = ".";
 const WELCOME_CHANNEL_ID = "123456789012345678";
+const ticketCategoryName = "TICKETS";
 
 // ===== DATABASE =====
 const eco = new Map();
-const ticketCategoryName = "TICKETS";
+const cooldown = new Map();
 
 // ===== READY =====
 client.once("ready", () => {
@@ -41,27 +43,25 @@ client.once("ready", () => {
 function getBal(id) {
   return eco.get(id) || { cash: 0, bank: 0 };
 }
-
 function setBal(id, data) {
   eco.set(id, data);
 }
 
 // ================= WELCOME SYSTEM =================
 client.on("guildMemberAdd", async (member) => {
-  const channel = member.guild.systemChannel || member.guild.channels.cache.find(c => c.type === ChannelType.GuildText);
-
+  const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
   if (!channel) return;
 
   const embed = new EmbedBuilder()
-    .setTitle("👋 Welcome to the Server!")
+    .setTitle("👋 Welcome!")
     .setDescription(`Hey ${member}, welcome to **${member.guild.name}** 🚀`)
     .setColor("Green")
     .addFields(
-      { name: "👥 Member Count", value: `${member.guild.memberCount}`, inline: true },
-      { name: "📌 Enjoy your stay!", value: "Read rules & have fun 😄", inline: true }
+      { name: "👥 Members", value: `${member.guild.memberCount}`, inline: true },
+      { name: "📌 Enjoy!", value: "Read rules & have fun 😄", inline: true }
     )
     .setThumbnail(member.user.displayAvatarURL())
-    .setFooter({ text: "Welcome System Active" });
+    .setFooter({ text: "Welcome System" });
 
   channel.send({ embeds: [embed] });
 });
@@ -69,6 +69,11 @@ client.on("guildMemberAdd", async (member) => {
 // ================= MESSAGE COMMANDS =================
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
+
+  // cooldown (anti spam)
+  if (cooldown.has(msg.author.id)) return;
+  cooldown.set(msg.author.id, true);
+  setTimeout(() => cooldown.delete(msg.author.id), 1500);
 
   const args = msg.content.split(" ");
   const rawCmd = args[0].toLowerCase();
@@ -79,54 +84,35 @@ client.on("messageCreate", async (msg) => {
       const bal = getBal(msg.author.id);
       return msg.reply(`💰 Cash: ${bal.cash} | Bank: ${bal.bank}`);
     }
-
     if (rawCmd === "daily") {
       let bal = getBal(msg.author.id);
       bal.cash += 500;
       setBal(msg.author.id, bal);
-      return msg.reply("💸 Daily claimed (Owner Bonus)");
+      return msg.reply("💸 Owner Daily +500");
     }
   }
 
   // ===== PREFIX CHECK =====
   if (!msg.content.startsWith(PREFIX)) return;
-
   const command = rawCmd.slice(PREFIX.length);
 
-  // ================= HELP COMMAND =================
+  // ================= HELP =================
   if (command === "help") {
     const embed = new EmbedBuilder()
-      .setTitle("🤖 Bot Help Menu")
+      .setTitle("🤖 Bot Help Panel")
       .setColor("Blue")
-      .setDescription("All available commands")
-      .addFields(
-        {
-          name: "💰 Economy",
-          value: ".bal\n.daily\n.work",
-          inline: true
-        },
-        {
-          name: "🛡 Moderation",
-          value: ".kick @user\n.ban @user",
-          inline: true
-        },
-        {
-          name: "🎫 Tickets",
-          value: ".panel",
-          inline: true
-        },
-        {
-          name: "👑 Owner",
-          value: "bal\ndaily (no prefix)",
-          inline: false
-        }
-      )
-      .setFooter({ text: "Prefix: ." });
+      .setDescription("Choose a category below");
 
-    return msg.reply({ embeds: [embed] });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("help_eco").setLabel("💰 Economy").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("help_mod").setLabel("🛡 Moderation").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId("help_ticket").setLabel("🎫 Tickets").setStyle(ButtonStyle.Success)
+    );
+
+    return msg.reply({ embeds: [embed], components: [row] });
   }
 
-  // ===== ECONOMY =====
+  // ================= ECONOMY =================
   if (command === "bal") {
     const bal = getBal(msg.author.id);
     return msg.reply(`💰 Cash: ${bal.cash} | Bank: ${bal.bank}`);
@@ -136,7 +122,7 @@ client.on("messageCreate", async (msg) => {
     let bal = getBal(msg.author.id);
     bal.cash += 200;
     setBal(msg.author.id, bal);
-    return msg.reply("💸 You got 200 coins!");
+    return msg.reply("💸 +200 coins");
   }
 
   if (command === "work") {
@@ -144,16 +130,16 @@ client.on("messageCreate", async (msg) => {
     const earn = Math.floor(Math.random() * 300) + 1;
     bal.cash += earn;
     setBal(msg.author.id, bal);
-    return msg.reply(`💼 You earned ${earn} coins`);
+    return msg.reply(`💼 Earned ${earn} coins`);
   }
 
-  // ===== MODERATION =====
+  // ================= MODERATION =================
   if (command === "kick") {
     if (!msg.member.permissions.has(PermissionsBitField.Flags.KickMembers))
       return msg.reply("❌ No permission");
 
     const user = msg.mentions.members.first();
-    if (!user) return msg.reply("❌ Mention a user");
+    if (!user) return msg.reply("❌ Mention user");
 
     await user.kick();
     msg.reply(`👢 Kicked ${user.user.tag}`);
@@ -164,38 +150,57 @@ client.on("messageCreate", async (msg) => {
       return msg.reply("❌ No permission");
 
     const user = msg.mentions.members.first();
-    if (!user) return msg.reply("❌ Mention a user");
+    if (!user) return msg.reply("❌ Mention user");
 
     await user.ban();
     msg.reply(`🚫 Banned ${user.user.tag}`);
   }
 
-  // ===== TICKET PANEL =====
+  // ================= TICKET =================
   if (command === "panel") {
     const embed = new EmbedBuilder()
       .setTitle("🎫 Support System")
-      .setDescription("Click below to create a ticket")
-      .setColor("Blue");
+      .setColor("Purple")
+      .setDescription("Click below to create a ticket");
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("ticket_create")
-        .setLabel("Create Ticket")
-        .setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId("ticket_create").setLabel("Create Ticket").setStyle(ButtonStyle.Success)
     );
 
     msg.channel.send({ embeds: [embed], components: [row] });
   }
 });
 
-// ================= INTERACTIONS =================
+// ================= BUTTONS =================
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
 
-  // ===== CREATE TICKET =====
+  // HELP BUTTONS
+  if (interaction.customId === "help_eco") {
+    return interaction.reply({
+      content: "💰 Economy: .bal .daily .work",
+      ephemeral: true
+    });
+  }
+
+  if (interaction.customId === "help_mod") {
+    return interaction.reply({
+      content: "🛡 Moderation: .kick .ban",
+      ephemeral: true
+    });
+  }
+
+  if (interaction.customId === "help_ticket") {
+    return interaction.reply({
+      content: "🎫 Tickets: .panel",
+      ephemeral: true
+    });
+  }
+
+  // TICKET CREATE
   if (interaction.customId === "ticket_create") {
     let category = interaction.guild.channels.cache.find(
-      (c) => c.name === ticketCategoryName && c.type === ChannelType.GuildCategory
+      c => c.name === ticketCategoryName && c.type === ChannelType.GuildCategory
     );
 
     if (!category) {
@@ -210,14 +215,8 @@ client.on("interactionCreate", async (interaction) => {
       type: ChannelType.GuildText,
       parent: category.id,
       permissionOverwrites: [
-        {
-          id: interaction.guild.id,
-          deny: [PermissionsBitField.Flags.ViewChannel]
-        },
-        {
-          id: interaction.user.id,
-          allow: [PermissionsBitField.Flags.ViewChannel]
-        }
+        { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+        { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel] }
       ]
     });
 
@@ -228,17 +227,17 @@ client.on("interactionCreate", async (interaction) => {
         .setStyle(ButtonStyle.Danger)
     );
 
-    await channel.send({
-      content: `🎫 ${interaction.user} welcome! Staff will assist you.`,
+    channel.send({
+      content: `🎫 ${interaction.user} wait for staff...`,
       components: [row]
     });
 
     return interaction.reply({ content: `Ticket created: ${channel}`, ephemeral: true });
   }
 
-  // ===== CLOSE TICKET =====
+  // CLOSE TICKET
   if (interaction.customId === "ticket_close") {
-    await interaction.reply("🔒 Closing ticket...");
+    await interaction.reply("Closing...");
     setTimeout(() => interaction.channel.delete(), 2000);
   }
 });
