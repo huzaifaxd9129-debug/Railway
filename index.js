@@ -23,21 +23,6 @@ const WELCOME_CHANNEL = "123456789012345678";
 // ================= ACTIVE GIVEAWAYS =================
 const activeGiveaways = new Map();
 
-// ================= COMMAND LOADER =================
-client.commands = new Collection();
-
-const commandFiles = fs
-  .readdirSync("./commands")
-  .filter(file => file.endsWith(".js"));
-
-for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
-  if (!command?.name) continue;
-  client.commands.set(command.name, command);
-}
-
-console.log(`✅ Loaded ${client.commands.size} commands`);
-
 // ================= READY =================
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
