@@ -24,10 +24,9 @@ const PREFIX = ".";
 const OWNER_ID = "1363540480662704248";
 const WELCOME_CHANNEL_ID = "123456789012345678";
 
-// ================= DATABASE (MEMORY ONLY) =================
+// ================= DATABASE (NO MONGO) =================
 const eco = new Map();
-const cooldown = new Set();
-const giveaways = new Map();
+const warns = new Map();
 
 // ================= READY =================
 client.once("ready", () => {
@@ -40,10 +39,10 @@ client.once("ready", () => {
 });
 
 // ================= ECONOMY =================
-function getUser(id) {
-  return eco.get(id) || { cash: 0, bank: 0 };
+function getEco(id) {
+  return eco.get(id) || { cash: 0 };
 }
-function setUser(id, data) {
+function setEco(id, data) {
   eco.set(id, data);
 }
 
@@ -52,137 +51,177 @@ client.on("guildMemberAdd", (member) => {
   const ch = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
   if (!ch) return;
 
-  ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setTitle("👋 Welcome!")
-        .setDescription(`Welcome ${member} to **${member.guild.name}**`)
-        .setColor("Green")
-    ]
-  });
+  const embed = new EmbedBuilder()
+    .setTitle("👋 Welcome to the Server!")
+    .setDescription(`${member} joined **${member.guild.name}**`)
+    .setColor("Green")
+    .setThumbnail(member.user.displayAvatarURL())
+    .addFields(
+      { name: "👥 Members", value: `${member.guild.memberCount}`, inline: true }
+    );
+
+  ch.send({ embeds: [embed] });
 });
 
 // ================= MESSAGE =================
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
-
-  // anti spam cooldown
-  if (cooldown.has(msg.author.id)) return;
-  cooldown.add(msg.author.id);
-  setTimeout(() => cooldown.delete(msg.author.id), 800);
-
-  const args = msg.content.split(" ");
-  const cmd = args[0].toLowerCase();
-
   if (!msg.content.startsWith(PREFIX)) return;
-  const command = cmd.slice(PREFIX.length);
 
-  let user = getUser(msg.author.id);
+  const args = msg.content.slice(PREFIX.length).split(/ +/);
+  const cmd = args.shift().toLowerCase();
 
-  // ================= HELP MENU =================
-  if (command === "help") {
+  let user = getEco(msg.author.id);
+
+  // ================= ECONOMY =================
+  if (cmd === "bal") return msg.reply(`💰 Cash: ${user.cash}`);
+
+  if (cmd === "daily") {
+    user.cash += 500;
+    setEco(msg.author.id, user);
+    return msg.reply("💸 Daily claimed!");
+  }
+
+  if (cmd === "work") {
+    let earn = Math.floor(Math.random() * 1000);
+    user.cash += earn;
+    setEco(msg.author.id, user);
+    return msg.reply(`💼 Earned ${earn}`);
+  }
+
+  // ================= FUN =================
+  if (cmd === "ping") return msg.reply(`🏓 ${client.ws.ping}ms`);
+
+  if (cmd === "roll") {
+    return msg.reply(`🎲 ${Math.floor(Math.random() * 6) + 1}`);
+  }
+
+  // ================= USER INFO =================
+  if (cmd === "userinfo") {
+    const member = msg.mentions.members.first() || msg.member;
+
+    const embed = new EmbedBuilder()
+      .setTitle("👤 User Info")
+      .setThumbnail(member.user.displayAvatarURL())
+      .addFields(
+        { name: "Name", value: member.user.username },
+        { name: "ID", value: member.id },
+        { name: "Joined", value: member.joinedAt.toDateString() }
+      );
+
+    return msg.reply({ embeds: [embed] });
+  }
+
+  // ================= SERVER INFO =================
+  if (cmd === "serverinfo") {
+    const g = msg.guild;
+
     return msg.reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle("⚡ Premium Help Panel")
-          .setColor("Gold")
-          .setDescription("Choose category below")
-      ],
-      components: [
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("eco").setLabel("💰 Economy").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId("mod").setLabel("🛡 Moderation").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("fun").setLabel("🎮 Fun").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("ticket").setLabel("🎫 Ticket").setStyle(ButtonStyle.Secondary)
-        )
+          .setTitle("🏠 Server Info")
+          .addFields(
+            { name: "Name", value: g.name },
+            { name: "Members", value: `${g.memberCount}` }
+          )
       ]
     });
   }
 
-  // ================= ECONOMY =================
-  if (command === "bal") {
-    return msg.reply(`💰 Cash: ${user.cash}`);
+  // ================= WARN SYSTEM =================
+  if (cmd === "warn") {
+    if (!msg.member.permissions.has(PermissionsBitField.Flags.ModerateMembers))
+      return msg.reply("No permission");
+
+    const user = msg.mentions.members.first();
+    if (!user) return msg.reply("Mention user");
+
+    let data = warns.get(user.id) || 0;
+    warns.set(user.id, data + 1);
+
+    return msg.reply(`⚠️ Warned ${user.user.username} (${data + 1})`);
   }
 
-  if (command === "daily") {
-    user.cash += 250;
-    setUser(msg.author.id, user);
-    return msg.reply("💸 +250 coins");
-  }
+  // ================= MODERATION (40+ STYLE CORE) =================
 
-  if (command === "work") {
-    let earn = Math.floor(Math.random() * 500);
-    user.cash += earn;
-    setUser(msg.author.id, user);
-    return msg.reply(`💼 Earned ${earn}`);
-  }
-
-  if (command === "pay") {
-    let target = msg.mentions.users.first();
-    let amount = parseInt(args[2]);
-
-    if (!target || !amount) return msg.reply("Usage: .pay @user amount");
-
-    let tUser = getUser(target.id);
-
-    if (user.cash < amount) return msg.reply("❌ Not enough money");
-
-    user.cash -= amount;
-    tUser.cash += amount;
-
-    setUser(msg.author.id, user);
-    setUser(target.id, tUser);
-
-    return msg.reply(`💸 Sent ${amount}`);
-  }
-
-  // ================= MODERATION =================
-  if (command === "kick") {
-    if (!msg.member.permissions.has(PermissionsBitField.Flags.KickMembers))
-      return msg.reply("❌ No permission");
-
-    let m = msg.mentions.members.first();
-    if (!m) return msg.reply("Mention user");
-
-    await m.kick();
+  if (cmd === "kick") {
+    const u = msg.mentions.members.first();
+    if (!u) return;
+    await u.kick();
     msg.reply("👢 Kicked");
   }
 
-  if (command === "ban") {
-    if (!msg.member.permissions.has(PermissionsBitField.Flags.BanMembers))
-      return msg.reply("❌ No permission");
-
-    let m = msg.mentions.members.first();
-    if (!m) return msg.reply("Mention user");
-
-    await m.ban();
+  if (cmd === "ban") {
+    const u = msg.mentions.members.first();
+    if (!u) return;
+    await u.ban();
     msg.reply("🚫 Banned");
   }
 
-  if (command === "clear") {
-    let amount = parseInt(args[1]);
-    if (!amount) return msg.reply("Enter number");
+  if (cmd === "unban") {
+    const id = args[0];
+    if (!id) return;
+    msg.guild.members.unban(id);
+    msg.reply("♻️ Unbanned");
+  }
 
-    await msg.channel.bulkDelete(amount);
+  if (cmd === "mute") {
+    const u = msg.mentions.members.first();
+    if (!u) return;
+    await u.timeout(10 * 60 * 1000);
+    msg.reply("🔇 Muted");
+  }
+
+  if (cmd === "unmute") {
+    const u = msg.mentions.members.first();
+    if (!u) return;
+    await u.timeout(null);
+    msg.reply("🔊 Unmuted");
+  }
+
+  if (cmd === "clear") {
+    let n = parseInt(args[0]);
+    if (!n) return;
+    msg.channel.bulkDelete(n);
     msg.reply("🧹 Cleared");
   }
 
-  // ================= FUN =================
-  if (command === "joke") return msg.reply("😂 Why did the bot cross the road?");
-  if (command === "coinflip") return msg.reply(Math.random() < 0.5 ? "Heads" : "Tails");
+  if (cmd === "slowmode") {
+    let t = parseInt(args[0]);
+    msg.channel.setRateLimitPerUser(t);
+    msg.reply("🐢 Slowmode set");
+  }
 
-  // ================= TICKET PANEL =================
-  if (command === "panel") {
-    return msg.channel.send({
+  // ================= HELP (PREMIUM UI STYLE) =================
+  if (cmd === "help") {
+    return msg.reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle("🎫 Ticket System")
+          .setTitle("⚡ HELP PANEL")
+          .setColor("Gold")
+          .setDescription("Choose a category:")
+          .addFields(
+            { name: "💰 Economy", value: ".bal .daily .work" },
+            { name: "🛡 Moderation", value: ".kick .ban .mute .unmute .clear .warn .unban .slowmode" },
+            { name: "🎮 Fun", value: ".ping .roll" },
+            { name: "ℹ️ Info", value: ".userinfo .serverinfo" }
+          )
+      ]
+    });
+  }
+
+  // ================= TICKET =================
+  if (cmd === "panel") {
+    msg.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("🎫 Support Tickets")
           .setColor("Purple")
       ],
       components: [
         new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId("ticket_create")
+            .setCustomId("ticket")
             .setLabel("Create Ticket")
             .setStyle(ButtonStyle.Success)
         )
@@ -195,17 +234,8 @@ client.on("messageCreate", async (msg) => {
 client.on("interactionCreate", async (i) => {
   if (!i.isButton()) return;
 
-  if (i.customId === "eco")
-    return i.reply({ content: "💰 Economy System Active", ephemeral: true });
-
-  if (i.customId === "mod")
-    return i.reply({ content: "🛡 Moderation Active", ephemeral: true });
-
-  if (i.customId === "fun")
-    return i.reply({ content: "🎮 Fun Active", ephemeral: true });
-
   if (i.customId === "ticket") {
-    let ch = await i.guild.channels.create({
+    const ch = await i.guild.channels.create({
       name: `ticket-${i.user.username}`,
       type: ChannelType.GuildText,
       permissionOverwrites: [
@@ -214,7 +244,7 @@ client.on("interactionCreate", async (i) => {
       ]
     });
 
-    ch.send("🎫 Support will help you soon");
+    ch.send("🎫 Staff will assist you soon");
     return i.reply({ content: "Ticket created", ephemeral: true });
   }
 });
