@@ -63,30 +63,31 @@ client.on("guildMemberAdd", (member) => {
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
-  // 🔥 PREFIX COMMAND HANDLER (ADDED FOR LOADER)
-  if (msg.content.startsWith(PREFIX)) {
-    const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
-    const cmdName = args.shift().toLowerCase();
+  if (!msg.content.startsWith(PREFIX)) return;
 
-    const command = client.commands.get(cmdName);
+  const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
+  const cmdName = args.shift().toLowerCase();
 
-    if (command) {
-      try {
-        return command.execute(client, msg, args);
-      } catch (err) {
-        console.error(err);
-        return msg.reply("❌ Error running command");
-      }
+  const member = msg.mentions.members.first();
+
+  // ================= LOADED COMMANDS =================
+  const command = client.commands.get(cmdName);
+  if (command) {
+    try {
+      return command.execute(client, msg, args, member, PermissionsBitField);
+    } catch (err) {
+      console.error(err);
+      return msg.reply("❌ Error running command");
     }
   }
 
   // ================= PING =================
-  if (msg.content === `${PREFIX}ping`) {
+  if (cmdName === "ping") {
     return msg.reply(`🏓 Pong: ${client.ws.ping}ms`);
   }
 
   // ================= HELP PANEL =================
-  if (msg.content === `${PREFIX}help`) {
+  if (cmdName === "help") {
     return msg.reply({
       embeds: [
         new EmbedBuilder()
@@ -103,7 +104,7 @@ client.on("messageCreate", async (msg) => {
   }
 
   // ================= TICKET PANEL =================
-  if (msg.content === `${PREFIX}ticketpanel`) {
+  if (cmdName === "ticketpanel") {
     msg.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -122,9 +123,7 @@ client.on("messageCreate", async (msg) => {
   }
 
   // ================= GIVEAWAY =================
-  if (msg.content.startsWith(`${PREFIX}giveaway`)) {
-    let args = msg.content.split(" ").slice(1);
-
+  if (cmdName === "giveaway") {
     let time = parseInt(args[0]) * 1000;
     let prize = args.slice(1).join(" ");
 
