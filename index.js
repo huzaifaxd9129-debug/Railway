@@ -14,7 +14,7 @@ const client = new Client({
   intents: Object.values(GatewayIntentBits)
 });
 
-const PREFIX = ".";
+const PREFIX = "+";
 const WELCOME_CHANNEL = "123456789012345678";
 
 // ================= READY =================
