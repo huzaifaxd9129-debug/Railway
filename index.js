@@ -60,12 +60,11 @@ client.on("messageCreate", async (msg) => {
         new EmbedBuilder()
           .setTitle("⚡ HELP PANEL")
           .setColor("Gold")
-          .setDescription("All systems loaded")
+          .setDescription("See All The Commands Here, Which Is Availble")
           .addFields(
-            { name: "🛡 Moderation", value: "mod commands loaded" },
-            { name: "🎮 Fun", value: "fun commands loaded" },
-            { name: "💰 Economy", value: "eco commands loaded" },
-            { name: "🎫 Systems", value: "ticket / giveaway / welcome" }
+            { name: "🛡 Moderation", value: "+ModHelp" },
+            { name: "🎮 Fun", value: "+FunHelp" },
+            { name: "💰 Economy", value: "+EcoHelp" },
           )
       ]
     });
