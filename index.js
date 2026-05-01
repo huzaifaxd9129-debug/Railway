@@ -7,8 +7,11 @@ const {
   PermissionsBitField,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  Collection
 } = require("discord.js");
+
+const fs = require("fs");
 
 const client = new Client({
   intents: Object.values(GatewayIntentBits)
@@ -16,6 +19,21 @@ const client = new Client({
 
 const PREFIX = "+";
 const WELCOME_CHANNEL = "123456789012345678";
+
+// ================= COMMAND LOADER =================
+client.commands = new Collection();
+
+const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js"));
+
+for (const file of commandFiles) {
+  const command = require(`./commands/${file}`);
+
+  if (!command?.name) continue;
+
+  client.commands.set(command.name, command);
+}
+
+console.log(`✅ Loaded ${client.commands.size} commands`);
 
 // ================= READY =================
 client.once("ready", () => {
@@ -33,7 +51,7 @@ client.on("guildMemberAdd", (member) => {
   if (!ch) return;
 
   const embed = new EmbedBuilder()
-    .setTitle("Welcome ${member} 🎉")
+    .setTitle(`Welcome ${member.user.username} 🎉`)
     .setDescription(`👋 Welcome to the server`)
     .setColor("Green")
     .setThumbnail(member.user.displayAvatarURL());
@@ -43,18 +61,32 @@ client.on("guildMemberAdd", (member) => {
 
 // ================= MESSAGE COMMANDS =================
 client.on("messageCreate", async (msg) => {
-  if (msg.author.bot || !msg.content.startsWith(PREFIX)) return;
+  if (msg.author.bot) return;
 
-  const args = msg.content.slice(PREFIX.length).split(/ +/);
-  const cmd = args.shift().toLowerCase();
+  // 🔥 PREFIX COMMAND HANDLER (ADDED FOR LOADER)
+  if (msg.content.startsWith(PREFIX)) {
+    const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
+    const cmdName = args.shift().toLowerCase();
+
+    const command = client.commands.get(cmdName);
+
+    if (command) {
+      try {
+        return command.execute(client, msg, args);
+      } catch (err) {
+        console.error(err);
+        return msg.reply("❌ Error running command");
+      }
+    }
+  }
 
   // ================= PING =================
-  if (cmd === "ping") {
+  if (msg.content === `${PREFIX}ping`) {
     return msg.reply(`🏓 Pong: ${client.ws.ping}ms`);
   }
 
   // ================= HELP PANEL =================
-  if (cmd === "help") {
+  if (msg.content === `${PREFIX}help`) {
     return msg.reply({
       embeds: [
         new EmbedBuilder()
@@ -64,14 +96,14 @@ client.on("messageCreate", async (msg) => {
           .addFields(
             { name: "🛡 Moderation", value: "+ModHelp" },
             { name: "🎮 Fun", value: "+FunHelp" },
-            { name: "💰 Economy", value: "+EcoHelp" },
+            { name: "💰 Economy", value: "+EcoHelp" }
           )
       ]
     });
   }
 
   // ================= TICKET PANEL =================
-  if (cmd === "ticketpanel") {
+  if (msg.content === `${PREFIX}ticketpanel`) {
     msg.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -90,11 +122,13 @@ client.on("messageCreate", async (msg) => {
   }
 
   // ================= GIVEAWAY =================
-  if (cmd === "giveaway") {
+  if (msg.content.startsWith(`${PREFIX}giveaway`)) {
+    let args = msg.content.split(" ").slice(1);
+
     let time = parseInt(args[0]) * 1000;
     let prize = args.slice(1).join(" ");
 
-    if (!time || !prize) return msg.reply("Usage: .giveaway 10 Nitro");
+    if (!time || !prize) return msg.reply("Usage: +giveaway 10 Nitro");
 
     let gmsg = await msg.channel.send(`🎉 GIVEAWAY: **${prize}**\nReact 🎉`);
 
@@ -116,7 +150,6 @@ client.on("messageCreate", async (msg) => {
 client.on("interactionCreate", async (i) => {
   if (!i.isButton()) return;
 
-  // TICKET CREATE
   if (i.customId === "ticket_create") {
     const ch = await i.guild.channels.create({
       name: `ticket-${i.user.username}`,
