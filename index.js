@@ -11,6 +11,8 @@ const {
   Collection
 } = require("discord.js");
 
+const fs = require("fs");
+
 const client = new Client({
   intents: Object.values(GatewayIntentBits)
 });
@@ -20,6 +22,23 @@ const WELCOME_CHANNEL = "123456789012345678";
 
 // ================= ACTIVE GIVEAWAYS =================
 const activeGiveaways = new Map();
+
+// ================= ECONOMY SYSTEM =================
+const ecoFile = "./eco.json";
+let eco = fs.existsSync(ecoFile)
+  ? JSON.parse(fs.readFileSync(ecoFile))
+  : {};
+
+function saveEco() {
+  fs.writeFileSync(ecoFile, JSON.stringify(eco, null, 2));
+}
+
+function getUser(id) {
+  if (!eco[id]) {
+    eco[id] = { wallet: 0, bank: 0, daily: 0 };
+  }
+  return eco[id];
+}
 
 // ================= READY =================
 client.once("ready", () => {
@@ -72,26 +91,12 @@ client.on("messageCreate", async (msg) => {
   // ================= HELP BUTTONS =================
   if (cmd === "help") {
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("help_mod")
-        .setLabel("🛡 Moderation")
-        .setStyle(ButtonStyle.Primary),
-
-      new ButtonBuilder()
-        .setCustomId("help_eco")
-        .setLabel("💰 Economy")
-        .setStyle(ButtonStyle.Success),
-
-      new ButtonBuilder()
-        .setCustomId("help_ticket")
-        .setLabel("🎫 Tickets")
-        .setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId("help_mod").setLabel("🛡 Moderation").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("help_eco").setLabel("💰 Economy").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("help_ticket").setLabel("🎫 Tickets").setStyle(ButtonStyle.Secondary)
     );
 
-    return msg.reply({
-      content: "📌 Select a category:",
-      components: [row]
-    });
+    return msg.reply({ content: "📌 Select a category:", components: [row] });
   }
 
   // ================= TICKET =================
@@ -104,11 +109,7 @@ client.on("messageCreate", async (msg) => {
     );
 
     return msg.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle("🎫 Support System")
-          .setColor("Blue")
-      ],
+      embeds: [new EmbedBuilder().setTitle("🎫 Support System").setColor("Blue")],
       components: [row]
     });
   }
@@ -118,8 +119,7 @@ client.on("messageCreate", async (msg) => {
     const time = parseInt(args[0]) * 1000;
     const prize = args.slice(1).join(" ");
 
-    if (!time || !prize)
-      return msg.reply("Usage: +giveaway 10 Nitro");
+    if (!time || !prize) return msg.reply("Usage: +giveaway 10 Nitro");
 
     const gmsg = await msg.channel.send({
       embeds: [
@@ -143,81 +143,363 @@ client.on("messageCreate", async (msg) => {
         .filter(u => !u.bot)
         .map(u => u.id);
 
-      if (users.length === 0)
+      if (!users.length)
         return msg.channel.send("❌ No participants");
 
-      const winner =
-        users[Math.floor(Math.random() * users.length)];
-
+      const winner = users[Math.floor(Math.random() * users.length)];
       msg.channel.send(`🏆 Winner: <@${winner}> | Prize: **${prize}**`);
     }, time);
   }
 
-  // ================= 40+ MOD COMMANDS (INSIDE INDEX) =================
-  if (cmd === "mod") {
-    const mcmd = args.shift()?.toLowerCase();
-    const isAdmin = msg.member.permissions.has(PermissionsBitField.Flags.Administrator);
+  // ================= 💰 ECONOMY COMMANDS =================
 
-    if (!isAdmin) return msg.reply("❌ Admin only");
-
-    if (!member && ["kick","ban","timeout","voicemute","voiceunmute","deafen","undeafen","addrole","removerole","nick"].includes(mcmd))
-      return msg.reply("❌ Mention user");
-
-    // BASIC MOD
-    if (mcmd === "kick") return member.kick().then(() => msg.reply("👢 Kicked"));
-    if (mcmd === "ban") return member.ban().then(() => msg.reply("🔨 Banned"));
-    if (mcmd === "unban") {
-      const id = args[0];
-      return msg.guild.members.unban(id).then(() => msg.reply("✅ Unbanned"));
-    }
-
-    if (mcmd === "timeout") return member.timeout(60000).then(() => msg.reply("⏳ Timed out"));
-    if (mcmd === "untimeout") return member.timeout(null).then(() => msg.reply("♻️ Timeout removed"));
-
-    if (mcmd === "voicemute") return member.voice.setMute(true).then(() => msg.reply("🔇 Muted"));
-    if (mcmd === "voiceunmute") return member.voice.setMute(false).then(() => msg.reply("🔊 Unmuted"));
-
-    if (mcmd === "deafen") return member.voice.setDeaf(true).then(() => msg.reply("🔇 Deafened"));
-    if (mcmd === "undeafen") return member.voice.setDeaf(false).then(() => msg.reply("🔊 Undeafened"));
-
-    if (mcmd === "clear") {
-      const amt = parseInt(args[0]) || 10;
-      return msg.channel.bulkDelete(amt).then(() => msg.reply(`🧹 Deleted ${amt}`));
-    }
-
-    if (mcmd === "nuke") {
-      msg.channel.clone().then(c => {
-        msg.channel.delete();
-        c.send("💥 Nuked");
-      });
-    }
-
-    if (mcmd === "lock") {
-      msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: false });
-      return msg.reply("🔒 Locked");
-    }
-
-    if (mcmd === "unlock") {
-      msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: true });
-      return msg.reply("🔓 Unlocked");
-    }
-
-    if (mcmd === "addrole") return member.roles.add(msg.mentions.roles.first());
-    if (mcmd === "removerole") return member.roles.remove(msg.mentions.roles.first());
-    if (mcmd === "nick") return member.setNickname(args.join(" "));
-
-    // EXTRA PLACEHOLDER COMMANDS (from your 40+ system)
-    const placeholders = [
-      "lockall","unlockall","hide","unhide","purge","softban","hackban",
-      "mute","unmute","clearwarns","warnings","move","disconnect",
-      "massban","prune","roleinfo","serverlock"
-    ];
-
-    if (placeholders.includes(mcmd))
-      return msg.reply(`⚠️ ${mcmd} system placeholder`);
-
-    return msg.reply("❌ Unknown mod command");
+  if (cmd === "bal") {
+    const user = getUser(msg.author.id);
+    return msg.reply(`💰 Wallet: $${user.wallet}\n🏦 Bank: $${user.bank}`);
   }
+
+  if (cmd === "daily") {
+    const user = getUser(msg.author.id);
+    const now = Date.now();
+
+    if (now - user.daily < 86400000)
+      return msg.reply("⏳ Already claimed daily");
+
+    user.wallet += 1000;
+    user.daily = now;
+    saveEco();
+
+    return msg.reply("🎁 You got $1000 daily!");
+  }
+
+  if (cmd === "work") {
+    const user = getUser(msg.author.id);
+    const earn = Math.floor(Math.random() * 500) + 100;
+
+    user.wallet += earn;
+    saveEco();
+
+    return msg.reply(`💼 You earned $${earn}`);
+  }
+
+  if (cmd === "beg") {
+    const user = getUser(msg.author.id);
+    const money = Math.floor(Math.random() * 200);
+
+    user.wallet += money;
+    saveEco();
+
+    return msg.reply(`🙏 Someone gave you $${money}`);
+  }
+
+  if (cmd === "rob") {
+    const target = msg.mentions.users.first();
+    if (!target) return msg.reply("Mention user");
+
+    const u = getUser(msg.author.id);
+    const v = getUser(target.id);
+
+    if (v.wallet < 200)
+      return msg.reply("❌ Too poor");
+
+    const steal = Math.floor(Math.random() * v.wallet);
+
+    v.wallet -= steal;
+    u.wallet += steal;
+
+    saveEco();
+
+    return msg.reply(`💀 Robbed $${steal} from ${target.username}`);
+  }
+
+  if (cmd === "pay") {
+    const target = msg.mentions.users.first();
+    const amt = parseInt(args[1]);
+
+    if (!target || !amt)
+      return msg.reply("Usage: +pay @user 500");
+
+    const u = getUser(msg.author.id);
+    const r = getUser(target.id);
+
+    if (u.wallet < amt)
+      return msg.reply("❌ Not enough money");
+
+    u.wallet -= amt;
+    r.wallet += amt;
+
+    saveEco();
+    return msg.reply(`💸 Paid $${amt}`);
+  }
+
+  if (cmd === "deposit") {
+    const user = getUser(msg.author.id);
+    const amt = parseInt(args[0]);
+
+    if (!amt || amt > user.wallet)
+      return msg.reply("❌ Invalid amount");
+
+    user.wallet -= amt;
+    user.bank += amt;
+
+    saveEco();
+    return msg.reply(`🏦 Deposited $${amt}`);
+  }
+
+  if (cmd === "withdraw") {
+    const user = getUser(msg.author.id);
+    const amt = parseInt(args[0]);
+
+    if (!amt || amt > user.bank)
+      return msg.reply("❌ Invalid amount");
+
+    user.bank -= amt;
+    user.wallet += amt;
+
+    saveEco();
+    return msg.reply(`💸 Withdrawn $${amt}`);
+  }
+
+  if (cmd === "slot") {
+    const user = getUser(msg.author.id);
+
+    const s = ["🍒","🍋","🍉","💎"];
+    const a = s[Math.floor(Math.random()*s.length)];
+    const b = s[Math.floor(Math.random()*s.length)];
+    const c = s[Math.floor(Math.random()*s.length)];
+
+    if (a === b && b === c) {
+      user.wallet += 1000;
+      saveEco();
+      return msg.reply(`🎰 ${a}${b}${c} JACKPOT +$1000`);
+    }
+
+    return msg.reply(`🎰 ${a}${b}${c} Lost`);
+  }
+
+  if (cmd === "leaderboard") {
+    const top = Object.entries(eco)
+      .sort((a,b) => (b[1].wallet + b[1].bank) - (a[1].wallet + a[1].bank))
+      .slice(0, 10);
+
+    const text = top.map((u,i)=>
+      `#${i+1} <@${u[0]}> - $${u[1].wallet + u[1].bank}`
+    ).join("\n");
+
+    return msg.reply("🏆 Leaderboard\n" + text);
+  }
+
+  // ================= 40+ MOD SYSTEM =================
+  if (cmd === "mod") {
+  const mcmd = args.shift()?.toLowerCase();
+  const isAdmin = msg.member.permissions.has(PermissionsBitField.Flags.Administrator);
+
+  if (!isAdmin) return msg.reply("❌ Admin only command");
+
+  const target = msg.mentions.members.first();
+
+  // ================= BASIC ACTIONS =================
+  if (mcmd === "kick") {
+    if (!target) return msg.reply("Mention user");
+    await target.kick();
+    return msg.reply("👢 Kicked user");
+  }
+
+  if (mcmd === "ban") {
+    if (!target) return msg.reply("Mention user");
+    await target.ban();
+    return msg.reply("🔨 Banned user");
+  }
+
+  if (mcmd === "unban") {
+    const id = args[0];
+    if (!id) return msg.reply("User ID required");
+    await msg.guild.members.unban(id);
+    return msg.reply("✅ Unbanned user");
+  }
+
+  if (mcmd === "timeout") {
+    if (!target) return msg.reply("Mention user");
+    await target.timeout(60_000);
+    return msg.reply("⏳ Timed out");
+  }
+
+  if (mcmd === "untimeout") {
+    if (!target) return msg.reply("Mention user");
+    await target.timeout(null);
+    return msg.reply("♻️ Timeout removed");
+  }
+
+  // ================= MESSAGE CONTROL =================
+  if (mcmd === "clear") {
+    const amount = parseInt(args[0]) || 10;
+    await msg.channel.bulkDelete(amount);
+    return msg.reply(`🧹 Deleted ${amount} messages`);
+  }
+
+  if (mcmd === "nuke") {
+    const clone = await msg.channel.clone();
+    await msg.channel.delete();
+    clone.send("💥 Channel nuked");
+  }
+
+  if (mcmd === "slowmode") {
+    const time = parseInt(args[0]);
+    msg.channel.setRateLimitPerUser(time);
+    return msg.reply(`🐢 Slowmode set to ${time}s`);
+  }
+
+  if (mcmd === "lock") {
+    await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, {
+      SendMessages: false
+    });
+    return msg.reply("🔒 Channel locked");
+  }
+
+  if (mcmd === "unlock") {
+    await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, {
+      SendMessages: true
+    });
+    return msg.reply("🔓 Channel unlocked");
+  }
+
+  // ================= ROLE CONTROL =================
+  if (mcmd === "addrole") {
+    const role = msg.mentions.roles.first();
+    if (!target || !role) return msg.reply("Mention user + role");
+    await target.roles.add(role);
+    return msg.reply("➕ Role added");
+  }
+
+  if (mcmd === "removerole") {
+    const role = msg.mentions.roles.first();
+    if (!target || !role) return msg.reply("Mention user + role");
+    await target.roles.remove(role);
+    return msg.reply("➖ Role removed");
+  }
+
+  if (mcmd === "nick") {
+    if (!target) return msg.reply("Mention user");
+    await target.setNickname(args.join(" "));
+    return msg.reply("✏️ Nickname changed");
+  }
+
+  if (mcmd === "resetnick") {
+    if (!target) return msg.reply("Mention user");
+    await target.setNickname(null);
+    return msg.reply("♻️ Nick reset");
+  }
+
+  // ================= VOICE CONTROL =================
+  if (mcmd === "voicemute") {
+    if (!target) return msg.reply("Mention user");
+    await target.voice.setMute(true);
+    return msg.reply("🔇 Voice muted");
+  }
+
+  if (mcmd === "voiceunmute") {
+    if (!target) return msg.reply("Mention user");
+    await target.voice.setMute(false);
+    return msg.reply("🔊 Voice unmuted");
+  }
+
+  if (mcmd === "deafen") {
+    if (!target) return msg.reply("Mention user");
+    await target.voice.setDeaf(true);
+    return msg.reply("🔇 Deafened");
+  }
+
+  if (mcmd === "undeafen") {
+    if (!target) return msg.reply("Mention user");
+    await target.voice.setDeaf(false);
+    return msg.reply("🔊 Undeafened");
+  }
+
+  if (mcmd === "disconnect") {
+    if (!target) return msg.reply("Mention user");
+    await target.voice.disconnect();
+    return msg.reply("📴 Disconnected from voice");
+  }
+
+  // ================= CHANNEL MANAGEMENT =================
+  if (mcmd === "lockall") {
+    msg.guild.channels.cache.forEach(c => {
+      c.permissionOverwrites.edit(msg.guild.roles.everyone, {
+        SendMessages: false
+      });
+    });
+    return msg.reply("🔒 All channels locked");
+  }
+
+  if (mcmd === "unlockall") {
+    msg.guild.channels.cache.forEach(c => {
+      c.permissionOverwrites.edit(msg.guild.roles.everyone, {
+        SendMessages: true
+      });
+    });
+    return msg.reply("🔓 All channels unlocked");
+  }
+
+  if (mcmd === "hide") {
+    msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, {
+      ViewChannel: false
+    });
+    return msg.reply("🙈 Channel hidden");
+  }
+
+  if (mcmd === "unhide") {
+    msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, {
+      ViewChannel: true
+    });
+    return msg.reply("👀 Channel visible");
+  }
+
+  // ================= MASS ACTIONS =================
+  if (mcmd === "massban") {
+    const users = msg.mentions.members;
+    users.forEach(async u => await u.ban());
+    return msg.reply("💀 Massban executed");
+  }
+
+  if (mcmd === "masskick") {
+    const users = msg.mentions.members;
+    users.forEach(async u => await u.kick());
+    return msg.reply("👢 Masskick executed");
+  }
+
+  if (mcmd === "prune") {
+    const count = parseInt(args[0]) || 10;
+    await msg.channel.bulkDelete(count);
+    return msg.reply("🧹 Pruned messages");
+  }
+
+  // ================= INFO / UTILITY =================
+  if (mcmd === "roleinfo") {
+    const role = msg.mentions.roles.first();
+    if (!role) return msg.reply("Mention role");
+    return msg.reply(`ℹ️ Role: ${role.name} | Members: ${role.members.size}`);
+  }
+
+  if (mcmd === "warnings") {
+    return msg.reply("📄 Warning system not connected (needs DB)");
+  }
+
+  if (mcmd === "clearwarns") {
+    return msg.reply("♻️ Warnings cleared (system needed)");
+  }
+
+  if (mcmd === "serverlock") {
+    msg.guild.channels.cache.forEach(c => {
+      c.permissionOverwrites.edit(msg.guild.roles.everyone, {
+        SendMessages: false,
+        ViewChannel: true
+      });
+    });
+    return msg.reply("🔐 Server locked");
+  }
+
+  return msg.reply("❌ Unknown mod command");
+}
 });
 
 // ================= BUTTONS =================
@@ -239,13 +521,13 @@ client.on("interactionCreate", async (i) => {
   }
 
   if (i.customId === "help_mod")
-    return i.reply({ content: "🛡 Moderation help loaded", ephemeral: true });
+    return i.reply({ content: "🛡 Mod help", ephemeral: true });
 
   if (i.customId === "help_eco")
-    return i.reply({ content: "💰 Economy help loaded", ephemeral: true });
+    return i.reply({ content: "💰 Eco help", ephemeral: true });
 
   if (i.customId === "help_ticket")
-    return i.reply({ content: "🎫 Ticket system help", ephemeral: true });
+    return i.reply({ content: "🎫 Ticket help", ephemeral: true });
 });
 
 // ================= LOGIN =================
