@@ -232,7 +232,7 @@ client.on("messageCreate", async (msg) => {
     return msg.reply(`💸 Paid $${amt}`);
   }
 
-  if (cmd === "deposit") {
+  if (cmd === "dep") {
     const user = getUser(msg.author.id);
     const amt = parseInt(args[0]);
 
