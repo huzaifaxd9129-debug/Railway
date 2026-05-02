@@ -39,7 +39,7 @@ if(ch) ch.send(`🎉 Welcome ${m} to **${m.guild.name}**`);
 client.on('messageCreate',async msg=>{
 if(!msg.guild || msg.author.bot) return;
 
-if (!msg.content.startsWith(prefix)) return;
+if(!msg.content.startsWith(prefix)) return;
 
 const args = msg.content.slice(prefix.length).trim().split(/ +/);
 const cmd = (args.shift() || '').toLowerCase();
