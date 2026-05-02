@@ -26,7 +26,7 @@ partials: [Partials.Channel]
 
 const prefix = '!';
 
-client.once('ready',()=>{
+client.once('clientReady',()=>{
 console.log(client.user.tag);
 client.user.setPresence({activities:[{name:'👑 Made By Huztro'}],status:'online'});
 });
