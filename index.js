@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const {
 Client,
 GatewayIntentBits,
@@ -10,15 +11,17 @@ ButtonStyle,
 StringSelectMenuBuilder
 } = require('discord.js');
 
-// All-in-One Discord Bot (discord.js v14) - 40+ MOD + 15+ ECO
-require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { QuickDB } = require('quick.db');
 const db = new QuickDB();
 
 const client = new Client({
-intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.GuildMembers,GatewayIntentBits.MessageContent],
-partials:[Partials.Channel]
+intents: [
+GatewayIntentBits.Guilds,
+GatewayIntentBits.GuildMessages,
+GatewayIntentBits.GuildMembers,
+GatewayIntentBits.MessageContent
+],
+partials: [Partials.Channel]
 });
 
 const prefix = '!';
