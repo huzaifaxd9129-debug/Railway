@@ -26,32 +26,49 @@ partials: [Partials.Channel]
 
 const prefix = '!';
 
-client.once('clientReady',()=>{
+// FIXED READY EVENT
+client.once('ready', () => {
 console.log(client.user.tag);
-client.user.setPresence({activities:[{name:'👑 Made By Huztro'}],status:'online'});
+client.user.setPresence({
+activities: [{ name: '👑 Made By Huztro' }],
+status: 'online'
+});
 });
 
-client.on('guildMemberAdd',m=>{
-const ch=m.guild.systemChannel;
-if(ch) ch.send(`🎉 Welcome ${m} to **${m.guild.name}**`);
+// WELCOME
+client.on('guildMemberAdd', m => {
+const ch = m.guild.systemChannel;
+if (ch) ch.send(`🎉 Welcome ${m} to **${m.guild.name}**`);
 });
 
-client.on('messageCreate',async msg=>{
-if(!msg.guild || msg.author.bot) return;
+// MESSAGE HANDLER
+client.on('messageCreate', async msg => {
+try {
 
-if(!msg.content.startsWith(prefix)) return;
+if (!msg.guild || msg.author.bot) return;
 
-const args = msg.content.slice(prefix.length).trim().split(/ +/);
-const cmd = (args.shift() || '').toLowerCase();
+// 🔥 ANTI LINK (runs for non-command messages too)
+if (!msg.content.startsWith(prefix)) {
 
-// ANTI LINK
 const anti = await db.get(`antilink_${msg.guild.id}`);
-if(anti && /(https?:\/\/|discord\.gg|www\.)/i.test(msg.content)){
-if(!msg.member.permissions.has(PermissionsBitField.Flags.ManageMessages)){
+
+if (
+anti &&
+/(https?:\/\/|discord\.gg|www\.)/i.test(msg.content)
+) {
+if (!msg.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
 await msg.delete().catch(()=>{});
 return msg.channel.send(`${msg.author} links not allowed`);
 }
 }
+
+return;
+}
+
+// PREFIX COMMANDS
+const args = msg.content.slice(prefix.length).trim().split(/ +/);
+const cmd = (args.shift() || '').toLowerCase();
+
 
 // ================= INFO =================
 if(cmd==='ping') return msg.reply(`Pong ${client.ws.ping}ms`);
@@ -118,6 +135,11 @@ client.on('interactionCreate',async i=>{
 if(i.isButton() && i.customId==='ticket'){
 const ch=await i.guild.channels.create({name:`ticket-${i.user.username}`});
 return i.reply({content:`Created ${ch}`,ephemeral:true});
+}
+});
+
+} catch (err) {
+console.log('BOT ERROR:', err);
 }
 });
 
