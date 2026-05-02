@@ -129,6 +129,10 @@ if(cmd==='ticketpanel'){
 const row=new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('ticket').setLabel('Ticket').setStyle(ButtonStyle.Primary));
 return msg.channel.send({content:'Ticket System',components:[row]});
 }
+
+} catch (err) {
+console.log('BOT ERROR:', err);
+}
 });
 
 client.on('interactionCreate', async i => {
