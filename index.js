@@ -131,12 +131,13 @@ return msg.channel.send({content:'Ticket System',components:[row]});
 }
 });
 
-client.on('interactionCreate',async i=>{
-if(i.isButton() && i.customId==='ticket'){
-const ch=await i.guild.channels.create({name:`ticket-${i.user.username}`});
-return i.reply({content:`Created ${ch}`,ephemeral:true});
+client.on('interactionCreate', async i => {
+try {
+
+if (i.isButton() && i.customId === 'ticket') {
+const ch = await i.guild.channels.create({ name: `ticket-${i.user.username}` });
+return i.reply({ content: `Created ${ch}`, ephemeral: true });
 }
-});
 
 } catch (err) {
 console.log('BOT ERROR:', err);
