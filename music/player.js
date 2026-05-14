@@ -1,11 +1,22 @@
 const { Player } = require("discord-player");
 
 module.exports = (client) => {
-  const player = new Player(client);
+
+  const player = new Player(client, {
+    ytdlOptions: {
+      quality: "highestaudio",
+      highWaterMark: 1 << 25
+    }
+  });
 
   client.player = player;
 
-  player.extractors.loadDefault();
+  // IMPORTANT: register extractors properly
+  async function loadExtractors() {
+    await player.extractors.loadDefault();
+  }
 
-  console.log("🎵 Music system ready!");
+  loadExtractors();
+
+  console.log("🎵 Player loaded successfully!");
 };
