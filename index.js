@@ -17,7 +17,7 @@ client.commands = new Collection();
 client.player = null;
 
 // ===== PREFIX =====
-const prefix = "!";
+const prefix = "+";
 
 // ===== LOAD MUSIC SYSTEM =====
 require("./music/player")(client);
