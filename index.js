@@ -76,4 +76,4 @@ client.on("messageCreate", async (message) => {
 });
 
 // ===== LOGIN =====
-client.login("YOUR_BOT_TOKEN_HERE");
+process.env.TOKEN
